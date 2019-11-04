@@ -1,0 +1,20 @@
+﻿<Window x:Class="GetImageWPF.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:GetImageWPF"
+        mc:Ignorable="d"
+        Title="Image converter - maurizio.conti@fablabromagna.org" Height="450" Width="800" WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal">
+            <Button x:Name="btnGo" Height="100" Width="100" Margin="5" Click="btnLoadImage" FontSize="30">Crea</Button>
+        </StackPanel>
+    </Grid>
+</Window>
