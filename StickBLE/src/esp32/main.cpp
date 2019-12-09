@@ -12,28 +12,24 @@ Testato su M5Stick-C
 - led ROSSO -> D10
 - Pulsante A (Grosso) -> D37 
 
-*/
+Elenca le seriali sul mac
+ls /dev/tty.*
 
+*/
 
 #include <Arduino.h>
 #include <M5StickC.h>
-
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
 
 #include <driver/adc.h>
 
-void Debounce( void );
-
 // Mapping I/O
 #define LED_ROSSO 10
 
-// tempo oltre il quale il pulsante lo consideriamo stabile
-#define DEBOUCE_TIME 10
-
 // velocità di update delle notifiche BLE
-#define TIMER_100 100
+#define TIMER_100 200
 
 bool deviceConnected = false;
 bool oldDeviceConnected;
@@ -51,7 +47,7 @@ unsigned long timer1ms = 0;
 uint8_t localSliderValue = 0;
 uint8_t oldLocalSliderValue = 0;
 
-// UUID BLE inventati da me...
+ // UUID BLE inventati da me...
 
 // Uno mi serve per esporre il service
 #define SERVICE_UUID "ABCD1234-0aaa-467a-9538-01f0652c74e8"
@@ -68,7 +64,13 @@ BLECharacteristic *buttonCharacteristic = NULL;
 BLECharacteristic *adcCharacteristic = NULL;
 
 // Gestione eventi server BLE
-class MyServerCallbacks: public BLEServerCallbacks {
+class MyServerCallbacks : public BLEServerCallbacks {
+
+    // onConnect e onDisconnect, sono due metodi virtuali
+    // dichiarati nella classe base.
+    // Qui vengono ridefiniti per eseguire azioni utili
+    // in questo progetto... ad esempio far lampeggaire led
+    // durante la connessione etc...
     void onConnect(BLEServer* pServer) {
 
       // Quando lo smartphone si collega...
@@ -104,9 +106,14 @@ class MyServerCallbacks: public BLEServerCallbacks {
 // La notifica parte lato smartphone muovendo uno slider.
 // Il valore di questo slider arriva a esp32 il quale varia la luminosità di un led
 class SliderValueCallbacks: public BLECharacteristicCallbacks {
+    
+    // Come per la onConnect-onDisconnect, qui abbiamo
+    // alcuni metodi virtuali che vengono ridefiniti ai nostri scopi
+    // sono onWrite, onRead, onNotify, onStatus 
     void onWrite(BLECharacteristic *pCharacteristic) {
       
-      // Quando lato smartphone parte una notifica, ci troviamo qui...
+      // Quando lato smartphone parte una notifica di scrittura,
+      // ci troviamo qui...
 
       // Segnalo questo movimento di dati con un blink
       digitalWrite( LED_ROSSO, LOW );
@@ -144,6 +151,7 @@ void ClearScreen()
 
 void GestioneValoreAnalogicoLCD()
 {
+  //  Stampa il valore che arriva dallo smartphone...
   if( localSliderValue != oldLocalSliderValue ){
     oldLocalSliderValue = localSliderValue;
     ClearScreen();
@@ -156,7 +164,7 @@ void GestioneValoreAnalogicoLCD()
 
 void GestioneLCD()
 {
-  // gestione colore
+  // gestione colore del puntino
   if ( waiting == 10 ){
     waiting=0;
     
@@ -169,19 +177,19 @@ void GestioneLCD()
   }  
   M5.Lcd.setTextColor(waitingColor);  
 
-  // gestione posizione
+  // gestione posizione (ritorna a capo)
   if( waiting == 0 ) {
     M5.Lcd.setCursor(3, 20);  
   }
   
-  // gestione cambio di stato
+  // Quando cambia da connesso/disconnesso, pulisce lo schermo
   if( deviceConnected != oldDeviceConnected )
   {
     oldDeviceConnected=deviceConnected;
     ClearScreen();
   }
 
-  // Gestione messaggio
+  // Gestione messaggio: se stampa il puntino o il messaggio
   if ( deviceConnected ) {
     M5.Lcd.setCursor(3, 20);  
     M5.Lcd.print("Connesso!");  
@@ -194,11 +202,18 @@ void GestioneLCD()
   delay(150);
 
 }
+
+//
+//
+// Setup
+//
+//
 void setup() {
 
   M5.begin();
   M5.MPU6886.Init();
 
+  //M5.Lcd.setBrightness((uint8_t)100);
   M5.Lcd.setRotation(3);
   ClearScreen();
 
@@ -210,19 +225,26 @@ void setup() {
   Serial.begin(115200);
   Serial.println("\n\nM5Stick Startup");
 
-  // BLEDevice racchiude le funzionalita BLE di ESP32 (Kolbam).
+  // BLE Device -------------------------------------------------
+  // racchiude le funzionalita BLE di ESP32 (Kolbam).
   BLEDevice::init( "Sensore Techno Back Brace" );
   Serial.println("Sensore TBB acceso!");
 
+  // BLE Server -------------------------------------------------
   // Grazie a BLEDevice Creaiamo un server BLE con relativo callback
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
+  // BLE Service ------------------------------------------------
   // Un server BLE espone servizi.
   // Un servizio a sua volta è un container con N characteristics.
   // Esponiamo lo UUID del service
   BLEService* pService = pServer->createService(SERVICE_UUID);
- 
+
+  //
+  // BLE Service ------------------------------------------------
+  //
+  // BLE Slider Characteristics ---------------------------------
   // Nel nostro service ci aggiungiamo due characteristic:
   // - una per ricevere il valore dello slider dallo smartphone
   // - una per comunicare allo smartphone lo stato del nostro pulsante esp32
@@ -231,7 +253,7 @@ void setup() {
   // ed è NOTIFY perchè può scatenare un evento lato esp32
   sliderCharacteristic = pService->createCharacteristic( 
       SLIDER_VALUE_UUID, 
-      BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_WRITE);
+      BLECharacteristic::PROPERTY_WRITE );
   
   // Attacco l'event handler per gestire le notifiche
   sliderCharacteristic->setCallbacks(new SliderValueCallbacks());
@@ -241,20 +263,24 @@ void setup() {
   // funziona anche senza ma se serve ecco come si usa...
   //sliderCharacteristic->addDescriptor(new BLE2902());
 
+  // BLE button Characteristics ---------------------------------
   // Questa characteristic è di READ perchè può essere letta da remoto 
   buttonCharacteristic = pService->createCharacteristic( 
       BUTTON_VALUE_UUID, 
       BLECharacteristic::PROPERTY_READ);
-
+ 
+  // BLE adc Characteristics ---------------------------------
   // Questa characteristic è di READ perchè può essere letta da remoto 
   adcCharacteristic = pService->createCharacteristic( 
       ADC_VALUE_UUID, 
       BLECharacteristic::PROPERTY_READ);
 
+  // BLE Start -----------------------------------------------
   // Si parte!
   pService->start();
 
-  // Facciamo un po' di pubblicità al nostro SERVICE.
+  // BLE Advertising -----------------------------------------
+  // Pubblichiamo il nostro SERVICE perchè sia visibile.
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->start();
@@ -262,6 +288,11 @@ void setup() {
   Serial.println( "Partiti..." );
 }
 
+//
+//
+//  Loop
+//
+//
 void loop() {
 
 	M5.update();
@@ -305,7 +336,7 @@ void loop() {
       adcCharacteristic->setValue( adcVal );
       adcCharacteristic->notify();
       
-      Serial.print("Sensore di hall: ");
+      Serial.print("PosX: ");
       Serial.println( adcVal );
     }
   }
