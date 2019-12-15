@@ -18,7 +18,10 @@ ls /dev/tty.*
 #include <BLEDevice.h>
 #include <BLEServer.h>
 
-void Stampa( int val );
+#include <driver/adc.h>
+
+void Stampa();
+void ReadAnalog();
 
 // Mapping I/O
 #define LED_ROSSO 10
@@ -28,6 +31,13 @@ bool oldDeviceConnected;
 
 uint8_t localSliderValue = 0;
 uint8_t oldLocalSliderValue = 0;
+
+int localAdcValue = 0;
+int oldLocalAdcValue = 0;
+
+//semaphore to access analog reader
+SemaphoreHandle_t shAnalogReader;
+
 
 // UUID BLE
 #define SERVICE_UUID "ABCD1234-0aaa-467a-9538-01f0652c74e8"
@@ -42,7 +52,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
       Serial.println("BLE Client Connected");
       
       // Accendo LCD e stampo valore iniziale
-      Stampa( 0 );
+      Stampa();
     };
 
     void onDisconnect(BLEServer* pServer) {
@@ -64,7 +74,7 @@ class SliderValueCallbacks: public BLECharacteristicCallbacks {
       localSliderValue = v[0];
 
       // Stampo il valore sull'LCD
-      Stampa( localSliderValue );
+      Stampa();
 
       // Segnalo poi sulla seriale (debug)
       Serial.print("New slider value ");
@@ -84,6 +94,18 @@ void setup() {
   M5.begin();
   M5.Lcd.begin();
   M5.Lcd.setRotation(3);
+
+	// Semaphores should only be used whilst the scheduler is running, but we can set it up here.
+	// create a semaphore to access analog reader
+	if(shAnalogReader == NULL) {// check to confirm that the Semaphore has not already been created.	
+		shAnalogReader = xSemaphoreCreateMutex();  // Create a mutex semaphore
+    if((shAnalogReader) != NULL)
+		  xSemaphoreGive((shAnalogReader));  // allow access by "Giving" the Semaphore.
+  }
+
+  // Configura Range 0-1023 su ADC 1
+  // Senza questa config, l'AD torna 4095-0 (contrario rispetto a 0-1023)
+  adc1_config_width(ADC_WIDTH_BIT_10);   
 
   // Blink su Led Rosso 
   pinMode( LED_ROSSO, OUTPUT );
@@ -137,16 +159,24 @@ void setup() {
 void loop() {
 
 	M5.update();
+
   if( !deviceConnected )
     Serial.print("."); // keep alive
+  else
+  {
+    //adcCharacteristic->setValue( adcVal );
+    //adcCharacteristic->notify();
+    ReadAnalog();
 
+  }
+  
   delay(200);
 }
 
 //
 // Stampa valore su LCD
 //
-void Stampa( int val )
+void Stampa()
 {
     M5.Lcd.fillScreen(TFT_NAVY);
     M5.Lcd.setTextColor(TFT_WHITE);
@@ -159,4 +189,27 @@ void Stampa( int val )
     M5.Lcd.setTextSize(3);
     M5.Lcd.setTextColor(TFT_YELLOW);  
     M5.Lcd.print(localSliderValue);  
+
+    M5.Lcd.setCursor(15, 60);  
+    M5.Lcd.setTextSize(3);
+    M5.Lcd.setTextColor(TFT_WHITE);  
+    M5.Lcd.print(localAdcValue);  
+}
+
+void ReadAnalog() {
+	if(xSemaphoreTake(shAnalogReader, (TickType_t)10) == pdTRUE) {
+		// We were able to obtain or "Take" the semaphore and can now access the shared resource.
+		//analog reads may take some time - meanwhile this we need exclusive access
+
+    int adcVal = adc1_get_raw( ADC1_CHANNEL_5 ); // GPIO33
+    //adcCharacteristic->setValue( adcVal );
+    //adcCharacteristic->notify();
+
+    if( localAdcValue != adcVal ) {
+      localAdcValue = adcVal;
+      Stampa();
+    }
+
+		xSemaphoreGive(shAnalogReader); // Now free or "Give" the reader to others
+	}	
 }
