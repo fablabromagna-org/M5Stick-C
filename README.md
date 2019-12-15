@@ -10,6 +10,9 @@ Aggiunto progetto WPF .NET per la generazione delle immagini da embeddare
 
 # StickBLE
 Basato sul progetto https://github.com/fablabromagna-org/ESP32BLE e adattato a M5Stick.
-
 Utilizza l'LCD dell'M5Stick, l'accellerometro, il pulsante A per comunicare con l'app iOS e Android pubblicata qui
 https://github.com/fablabromagna-org/ESP32BLE/tree/master/Xamarin/Basic
+
+# StickBLE-Mini
+Basato sul StickBLE ma ridotto all'essenziale.
+Utilizza l'LCD dell'M5Stick per visualizzare lo stato dello slider presente nella App.
