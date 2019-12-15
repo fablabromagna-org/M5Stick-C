@@ -8,7 +8,7 @@ maurizio.conti@fablabromagna.org
 Licenza GPLv3
 Testato su M5Stick-C 
 
-Elenca le seriali sul mac
+A volte USB non vede M5Stick... verifica seriali
 ls /dev/tty.*
 
 */
@@ -103,14 +103,21 @@ void setup() {
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
-  // BLE Service ------------------------------------------------
+  // All'interno del server ci abita uno o più BLE Service ------
   BLEService* pService = pServer->createService(SERVICE_UUID);
 
-  // BLE Characteristic ------------------------------------------------
+  // Un Service contiene N BLE Characteristic -------------------
   sliderCharacteristic = pService->createCharacteristic( 
       SLIDER_VALUE_UUID, 
       BLECharacteristic::PROPERTY_WRITE );
   sliderCharacteristic->setCallbacks(new SliderValueCallbacks());
+
+  // Per descrivere una characteristic, in BLE non basta una string.
+  // Ci sono strutture dati ben precise e codificate.
+  // Ad esempio la  2901 (characteristic user description)
+  BLEDescriptor sliderDescriptor(BLEUUID((uint16_t)0x2901));  
+  sliderDescriptor.setValue("Posizione dello slider da 0 a 100");
+  sliderCharacteristic->addDescriptor(&sliderDescriptor);
 
   pService->start();
 
