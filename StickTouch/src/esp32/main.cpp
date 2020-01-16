@@ -16,8 +16,8 @@ Adafruit_MPR121 mpr121 = Adafruit_MPR121();
 
 
 // WiFi stuff
-const char* ssid = "TP-Link_2128";
-const char* pwd = "65041758";
+const char* ssid = "TP-";
+const char* pwd = "";
 const IPAddress ip(192, 168, 0, 60);
 const IPAddress gateway(192, 168, 1, 1);
 const IPAddress subnet(255, 255, 255, 0);
