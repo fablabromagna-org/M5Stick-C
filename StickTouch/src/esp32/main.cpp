@@ -16,8 +16,8 @@ Adafruit_MPR121 mpr121 = Adafruit_MPR121();
 
 
 // WiFi stuff
-const char* ssid = "TP-";
-const char* pwd = "";
+const char* ssid = "TP-Link_2128";
+const char* pwd = "65041758";
 const IPAddress ip(192, 168, 0, 60);
 const IPAddress gateway(192, 168, 1, 1);
 const IPAddress subnet(255, 255, 255, 0);
@@ -72,6 +72,13 @@ void setup()   {
   Serial.print("WiFi connected, IP = "); Serial.println(WiFi.localIP());
 
   artnet.begin("192.168.0.62");
+  int cnt = 511;
+  
+  while(cnt>0)
+  {
+    data[cnt] = 0;
+    cnt--;
+  }
 
   ClearScreen();
   M5.Lcd.print(WiFi.localIP());  
@@ -96,25 +103,23 @@ void loop() {
     if( values[idx] > soglia ) {
       M5.Lcd.setTextColor(TFT_WHITE);
       
-      //value = 255;
-      //memset(data, value, size);
-      data[idx] = 0xff;
+      uint16_t val = 0xff;
+      memset( data+(idx*2), val, 2 );
       artnet.set(idx, data, size);
-      artnet.streaming(); 
+      artnet.streaming();
     }
     else {
       M5.Lcd.setTextColor(TFT_RED);
 
-      data[idx] = 0x00;
+      uint16_t val = 0x32;
+      memset( data+(idx*2), val, 2 );
       artnet.set(idx, data, size);
-      artnet.streaming(); 
+      artnet.streaming();
     }
 
     M5.Lcd.print( String( idx ) );  
   }
-   
-	M5.update();
-
-
+  
+  M5.update();
   delay(40);
 }
